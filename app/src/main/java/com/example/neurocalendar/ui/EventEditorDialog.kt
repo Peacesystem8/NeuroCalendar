@@ -11,7 +11,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,7 +34,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatterBuilder
+import java.time.format.DateTimeParseException
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun EventEditorDialog(
@@ -49,13 +55,17 @@ fun EventEditorDialog(
     }
     var title by remember(event?.id) { mutableStateOf(event?.title.orEmpty()) }
     var startText by remember(event?.id) {
-        mutableStateOf(eventStart?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "09:00")
+        mutableStateOf(eventStart?.format(eventTimeInputFormatter) ?: "9:00 AM")
     }
     var endText by remember(event?.id) {
-        mutableStateOf(eventEnd?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "10:00")
+        mutableStateOf(eventEnd?.format(eventTimeInputFormatter) ?: "10:00 AM")
     }
     var notes by remember(event?.id) { mutableStateOf(event?.description.orEmpty()) }
     var location by remember(event?.id) { mutableStateOf(event?.location.orEmpty()) }
+    var reminderMinutesBefore by remember(event?.id) {
+        mutableStateOf(event?.reminderMinutesBefore ?: 0)
+    }
+    var showReminderOptions by remember(event?.id) { mutableStateOf(false) }
     var showOptionalFields by remember(event?.id) {
         mutableStateOf(!event?.description.isNullOrBlank() || !event?.location.isNullOrBlank())
     }
@@ -78,7 +88,8 @@ fun EventEditorDialog(
             description = notes.trim().ifBlank { null },
             startTimeMillis = date.atTime(startTime).atZone(zone).toInstant().toEpochMilli(),
             endTimeMillis = date.atTime(endTime).atZone(zone).toInstant().toEpochMilli(),
-            location = location.trim().ifBlank { null }
+            location = location.trim().ifBlank { null },
+            reminderMinutesBefore = reminderMinutesBefore
         )
 
         scope.launch {
@@ -129,13 +140,13 @@ fun EventEditorDialog(
                     onValueChange = { startText = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Start time") },
-                    placeholder = { Text("09:00") },
+                    placeholder = { Text("9:00 AM") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     isError = attemptedSave && startTime == null,
                     supportingText = {
                         if (attemptedSave && startTime == null) {
-                            Text("Use 24-hour time, for example 09:30.")
+                            Text("Use 9:30 AM/PM, or 24-hour time such as 21:30.")
                         }
                     }
                 )
@@ -144,18 +155,42 @@ fun EventEditorDialog(
                     onValueChange = { endText = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("End time") },
-                    placeholder = { Text("10:00") },
+                    placeholder = { Text("10:00 AM") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     isError = attemptedSave && (endTime == null || invalidTimeOrder),
                     supportingText = {
                         if (attemptedSave && endTime == null) {
-                            Text("Use 24-hour time, for example 10:30.")
+                            Text("Use 10:30 AM/PM, or 24-hour time such as 22:30.")
                         } else if (attemptedSave && invalidTimeOrder) {
                             Text("Choose an end time after the start time.")
                         }
                     }
                 )
+                Text("Reminder", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "One quiet notification. No repeats.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                androidx.compose.foundation.layout.Box {
+                    OutlinedButton(onClick = { showReminderOptions = true }) {
+                        Text(reminderLabel(reminderMinutesBefore))
+                    }
+                    DropdownMenu(
+                        expanded = showReminderOptions,
+                        onDismissRequest = { showReminderOptions = false }
+                    ) {
+                        listOf(0, 5, 10, 15, 30).forEach { minutes ->
+                            DropdownMenuItem(
+                                text = { Text(reminderLabel(minutes)) },
+                                onClick = {
+                                    reminderMinutesBefore = minutes
+                                    showReminderOptions = false
+                                }
+                            )
+                        }
+                    }
+                }
                 TextButton(onClick = { showOptionalFields = !showOptionalFields }) {
                     Text(if (showOptionalFields) "Hide optional details" else "Add notes or location")
                 }
@@ -200,10 +235,31 @@ fun EventEditorDialog(
 }
 
 internal fun parseEventTime(value: String): LocalTime? {
-    val parts = value.trim().split(':')
+    val input = value.trim()
+    val normalizedInput = Regex("(?i)(?<=\\d)\\s*(AM|PM)$")
+        .replace(input) { " ${it.groupValues[1]}" }
+    if (normalizedInput.endsWith("AM", ignoreCase = true) ||
+        normalizedInput.endsWith("PM", ignoreCase = true)
+    ) {
+        return try {
+            LocalTime.parse(normalizedInput, eventTimeInputFormatter)
+        } catch (_: DateTimeParseException) {
+            null
+        }
+    }
+
+    val parts = input.split(':')
     if (parts.size != 2) return null
     val hour = parts[0].toIntOrNull() ?: return null
     val minute = parts[1].toIntOrNull() ?: return null
     if (hour !in 0..23 || minute !in 0..59) return null
     return LocalTime.of(hour, minute)
 }
+
+private val eventTimeInputFormatter = DateTimeFormatterBuilder()
+    .parseCaseInsensitive()
+    .appendPattern("h:mm a")
+    .toFormatter(Locale.US)
+
+private fun reminderLabel(minutes: Int): String =
+    if (minutes == 0) "No reminder" else "$minutes minutes before"

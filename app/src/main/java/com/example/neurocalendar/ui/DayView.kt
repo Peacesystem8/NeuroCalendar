@@ -1,17 +1,22 @@
 package com.example.neurocalendar.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.neurocalendar.domain.model.CalendarItem
@@ -62,6 +67,7 @@ fun DateHeader(date: LocalDate) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
@@ -101,27 +107,98 @@ fun DateHeader(date: LocalDate) {
 @Composable
 fun DayEmptyView(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(32.dp),
+        modifier = modifier.fillMaxWidth().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = Icons.Filled.HourglassEmpty,
-            contentDescription = "No schedule found",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(80.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        CozyCalendarIllustration()
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "🕊️ No scheduled items for this day.",
+            text = "A little breathing room",
             style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "No plans on the calendar for this day.",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Time to focus on a task or plan some new activities!",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            text = "Take a slow breath, or add something lovely.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun CozyCalendarIllustration() {
+    val colors = MaterialTheme.colorScheme
+    Canvas(Modifier.size(width = 184.dp, height = 148.dp)) {
+        val scale = size.width / 184f
+        fun point(value: Float) = value * scale
+
+        drawCircle(
+            color = colors.tertiaryContainer,
+            radius = point(57f),
+            center = Offset(point(111f), point(70f))
+        )
+        drawRoundRect(
+            color = colors.surface,
+            topLeft = Offset(point(41f), point(27f)),
+            size = Size(point(96f), point(90f)),
+            cornerRadius = CornerRadius(point(17f))
+        )
+        drawRoundRect(
+            color = colors.primary,
+            topLeft = Offset(point(41f), point(27f)),
+            size = Size(point(96f), point(34f)),
+            cornerRadius = CornerRadius(point(17f))
+        )
+        drawRect(
+            color = colors.primary,
+            topLeft = Offset(point(41f), point(44f)),
+            size = Size(point(96f), point(17f))
+        )
+        listOf(68f, 110f).forEach { x ->
+            drawLine(
+                color = colors.onPrimary,
+                start = Offset(point(x), point(20f)),
+                end = Offset(point(x), point(39f)),
+                strokeWidth = point(4f),
+                cap = StrokeCap.Round
+            )
+        }
+        val dateDots = listOf(
+            Triple(64f, 76f, colors.tertiary),
+            Triple(89f, 76f, colors.secondary),
+            Triple(114f, 76f, colors.secondary),
+            Triple(64f, 98f, colors.secondary),
+            Triple(89f, 98f, colors.tertiary),
+            Triple(114f, 98f, colors.secondary)
+        )
+        dateDots.forEach { (x, y, color) ->
+            drawCircle(color, point(4f), Offset(point(x), point(y)))
+        }
+        drawLine(
+            color = colors.secondary,
+            start = Offset(point(137f), point(119f)),
+            end = Offset(point(153f), point(91f)),
+            strokeWidth = point(3f),
+            cap = StrokeCap.Round
+        )
+        drawOval(
+            color = colors.secondaryContainer,
+            topLeft = Offset(point(135f), point(96f)),
+            size = Size(point(15f), point(8f))
+        )
+        drawOval(
+            color = colors.secondaryContainer,
+            topLeft = Offset(point(148f), point(85f)),
+            size = Size(point(15f), point(8f))
         )
     }
 }
@@ -137,10 +214,12 @@ fun DayItemCard(
 ) {
     // Use an animated card for expressive motion
     Card(
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 6.dp),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
@@ -152,16 +231,27 @@ fun DayItemCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (item is CalendarItem.EventItem) "EVENT" else "TASK",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (item is CalendarItem.EventItem) {
-                        MaterialTheme.colorScheme.primary
+                val isEvent = item is CalendarItem.EventItem
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (isEvent) {
+                        MaterialTheme.colorScheme.primaryContainer
                     } else {
-                        MaterialTheme.colorScheme.secondary
-                    },
-                    modifier = Modifier.padding(end = 8.dp)
-                )
+                        MaterialTheme.colorScheme.secondaryContainer
+                    }
+                ) {
+                    Text(
+                        text = if (isEvent) "EVENT" else "TASK",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isEvent) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        },
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.weight(1f))
                 if (item is CalendarItem.EventItem) {
                     TextButton(onClick = { onEditEvent(item) }) {
@@ -174,8 +264,7 @@ fun DayItemCard(
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textDecoration = TextDecoration.Underline,
+                fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
 
@@ -184,7 +273,7 @@ fun DayItemCard(
             // Time/Date Display (Most critical visual element)
             val timeDisplay = when (item) {
                 is CalendarItem.EventItem ->
-                    "${item.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))} - ${item.endTime.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+                    "${item.startTime.format(DateTimeFormatter.ofPattern("h:mm a"))} - ${item.endTime.format(DateTimeFormatter.ofPattern("h:mm a"))}"
                 is CalendarItem.TaskItem ->
                     "Due: ${item.dueDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}"
             }

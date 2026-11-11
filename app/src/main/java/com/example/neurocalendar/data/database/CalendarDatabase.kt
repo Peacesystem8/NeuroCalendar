@@ -16,8 +16,8 @@ abstract class CalendarDatabase : RoomDatabase() {
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     "ALTER TABLE events ADD COLUMN reminderMinutesBefore INTEGER NOT NULL DEFAULT 0"
                 )
             }
