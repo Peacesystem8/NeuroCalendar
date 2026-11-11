@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.neurocalendar.data.repository.CalendarRepository
 import com.example.neurocalendar.data.model.Event
+import com.example.neurocalendar.data.model.Task
 import com.example.neurocalendar.domain.model.CalendarItem
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -55,6 +56,20 @@ class DayViewModel(private val repository: CalendarRepository, savedStateHandle:
     }
 
     suspend fun saveEvent(event: Event): Event = repository.saveEvent(event)
+
+    suspend fun saveTask(task: Task): Task = repository.saveTask(task)
+
+    suspend fun getUpcomingTaskReminders(todayStartMillis: Long): List<Task> =
+        repository.getUpcomingTaskReminders(todayStartMillis)
+
+    suspend fun setTaskOccurrenceCompleted(
+        taskId: Int,
+        dueDateMillis: Long,
+        isCompleted: Boolean
+    ) = repository.setTaskOccurrenceCompleted(taskId, dueDateMillis, isCompleted)
+
+    suspend fun clearCompletedTasksAndPastEvents(currentTimeMillis: Long) =
+        repository.clearCompletedTasksAndPastEvents(currentTimeMillis)
 
     suspend fun getUpcomingReminderEvents(currentTimeMillis: Long): List<Event> =
         repository.getUpcomingReminderEvents(currentTimeMillis)

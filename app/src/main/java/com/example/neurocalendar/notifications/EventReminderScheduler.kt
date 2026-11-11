@@ -7,9 +7,12 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.example.neurocalendar.data.model.Event
+import com.example.neurocalendar.domain.model.nextOccurrenceOnOrAfter
+import java.time.Instant
+import java.time.ZoneId
 import android.Manifest
 import android.content.pm.PackageManager
-import com.example.neurocalendar.data.model.Event
 
 class EventReminderScheduler(context: Context) {
     private val appContext = context.applicationContext
@@ -19,15 +22,18 @@ class EventReminderScheduler(context: Context) {
         cancel(event.id)
         if (event.reminderMinutesBefore <= 0) return
 
-        val triggerAtMillis = event.startTimeMillis -
-            event.reminderMinutesBefore * MILLIS_PER_MINUTE
-        if (triggerAtMillis <= System.currentTimeMillis()) return
+        val now = System.currentTimeMillis()
+        val triggerAtMillis = nextTriggerAtMillis(event, now) ?: return
         if (!canScheduleExactAlarms()) return
 
         alarmManager.setExactAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
             triggerAtMillis,
-            createPendingIntent(event, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            createPendingIntent(
+                event,
+                triggerAtMillis + event.reminderMinutesBefore * MILLIS_PER_MINUTE,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         )
     }
 
@@ -35,10 +41,8 @@ class EventReminderScheduler(context: Context) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 
     fun requiresExactAlarmAccess(event: Event): Boolean {
-        val triggerAtMillis = event.startTimeMillis -
-            event.reminderMinutesBefore * MILLIS_PER_MINUTE
         return event.reminderMinutesBefore > 0 &&
-            triggerAtMillis > System.currentTimeMillis() &&
+            nextTriggerAtMillis(event, System.currentTimeMillis()) != null &&
             !canScheduleExactAlarms()
     }
 
@@ -54,21 +58,65 @@ class EventReminderScheduler(context: Context) {
         pendingIntent.cancel()
     }
 
-    private fun createPendingIntent(event: Event, flags: Int): PendingIntent =
+    private fun createPendingIntent(
+        event: Event,
+        occurrenceStartMillis: Long,
+        flags: Int
+    ): PendingIntent =
         PendingIntent.getBroadcast(
             appContext,
             event.id,
-            reminderIntent(event.id, event.title, event.reminderMinutesBefore),
+            reminderIntent(event.id, event.title, event.reminderMinutesBefore, occurrenceStartMillis),
             flags
         )
 
-    private fun reminderIntent(eventId: Int, title: String, minutesBefore: Int) =
+    private fun reminderIntent(
+        eventId: Int,
+        title: String,
+        minutesBefore: Int,
+        occurrenceStartMillis: Long = 0L
+    ) =
         Intent(appContext, EventReminderReceiver::class.java).apply {
             action = ACTION_EVENT_REMINDER
             putExtra(EXTRA_EVENT_ID, eventId)
             putExtra(EXTRA_EVENT_TITLE, title)
             putExtra(EXTRA_MINUTES_BEFORE, minutesBefore)
+            putExtra(EXTRA_OCCURRENCE_START, occurrenceStartMillis)
         }
+
+    private fun nextTriggerAtMillis(event: Event, nowMillis: Long): Long? {
+        val zone = ZoneId.systemDefault()
+        val anchorStart = event.getStartTime()
+        val anchorDate = anchorStart.toLocalDate()
+        val untilDate = event.repeatUntilMillis?.let {
+            Instant.ofEpochMilli(it).atZone(zone).toLocalDate()
+        }
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        var occurrenceDate = nextOccurrenceOnOrAfter(
+            anchorDate,
+            today,
+            event.repeatInterval,
+            event.repeatUnit,
+            untilDate
+        )
+        while (occurrenceDate != null) {
+            val occurrenceStart = occurrenceDate.atTime(anchorStart.toLocalTime())
+                .atZone(zone)
+                .toInstant()
+                .toEpochMilli()
+            val triggerAtMillis = occurrenceStart -
+                event.reminderMinutesBefore * MILLIS_PER_MINUTE
+            if (triggerAtMillis > nowMillis) return triggerAtMillis
+            occurrenceDate = nextOccurrenceOnOrAfter(
+                anchorDate,
+                occurrenceDate.plusDays(1),
+                event.repeatInterval,
+                event.repeatUnit,
+                untilDate
+            )
+        }
+        return null
+    }
 
     companion object {
         private const val MILLIS_PER_MINUTE = 60_000L
@@ -76,6 +124,7 @@ class EventReminderScheduler(context: Context) {
         const val EXTRA_EVENT_ID = "event_id"
         const val EXTRA_EVENT_TITLE = "event_title"
         const val EXTRA_MINUTES_BEFORE = "minutes_before"
+        const val EXTRA_OCCURRENCE_START = "occurrence_start"
 
         fun notificationsAllowed(context: Context): Boolean =
             NotificationManagerCompat.from(context).areNotificationsEnabled() &&

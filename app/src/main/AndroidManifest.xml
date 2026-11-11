@@ -32,6 +32,9 @@
             android:name=".notifications.EventReminderReceiver"
             android:exported="false" />
         <receiver
+            android:name=".notifications.TaskReminderReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".notifications.ReminderRescheduleReceiver"
             android:exported="true">
             <intent-filter>

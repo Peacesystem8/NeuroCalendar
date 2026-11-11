@@ -9,46 +9,65 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.neurocalendar.MainActivity
 import com.example.neurocalendar.R
+import com.example.neurocalendar.data.database.CalendarDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class EventReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val eventId = intent.getIntExtra(EventReminderScheduler.EXTRA_EVENT_ID, 0)
+        if (eventId == 0) return
         val title = intent.getStringExtra(EventReminderScheduler.EXTRA_EVENT_TITLE)
-            ?.takeIf(String::isNotBlank) ?: return
-        if (eventId == 0 || !EventReminderScheduler.notificationsAllowed(context)) return
+            ?.takeIf(String::isNotBlank)
 
-        ensureNotificationChannel(context)
+        if (title != null && EventReminderScheduler.notificationsAllowed(context)) {
+            ensureNotificationChannel(context)
 
-        val minutesBefore = intent.getIntExtra(EventReminderScheduler.EXTRA_MINUTES_BEFORE, 0)
-        val notificationSound =
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        val contentIntent = PendingIntent.getActivity(
-            context,
-            eventId,
-            Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_event_reminder)
-            .setContentTitle(title)
-            .setContentText("Starts in $minutesBefore minutes.")
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText("$title starts in $minutesBefore minutes.")
+            val minutesBefore = intent.getIntExtra(EventReminderScheduler.EXTRA_MINUTES_BEFORE, 0)
+            val notificationSound =
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val contentIntent = PendingIntent.getActivity(
+                context,
+                eventId,
+                Intent(context, MainActivity::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            .setContentIntent(contentIntent)
-            .setCategory(NotificationCompat.CATEGORY_EVENT)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setSound(notificationSound)
-            .setOnlyAlertOnce(true)
-            .setAutoCancel(true)
-            .build()
+            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_event_reminder)
+                .setContentTitle(title)
+                .setContentText("Starts in $minutesBefore minutes.")
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText("$title starts in $minutesBefore minutes.")
+                )
+                .setContentIntent(contentIntent)
+                .setCategory(NotificationCompat.CATEGORY_EVENT)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setSound(notificationSound)
+                .setAutoCancel(true)
+                .build()
 
-        NotificationManagerCompat.from(context).notify(eventId, notification)
+            NotificationManagerCompat.from(context).notify(eventId, notification)
+        }
+
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                CalendarDatabase.getInstance(context).calendarDao()
+                    .getEventById(eventId)
+                    ?.let { EventReminderScheduler(context).schedule(it) }
+            } catch (error: Exception) {
+                Log.e("EventReminderReceiver", "Unable to schedule the next event reminder", error)
+            } finally {
+                pendingResult.finish()
+            }
+        }
     }
 
     private fun ensureNotificationChannel(context: Context) {

@@ -21,6 +21,11 @@ sealed class CalendarItem {
         val endTime: LocalDateTime,
         val location: String?,
         val reminderMinutesBefore: Int = 0,
+        val repeatInterval: Int = 0,
+        val repeatUnit: String = "WEEK",
+        val repeatUntilMillis: Long? = null,
+        val anchorStartTimeMillis: Long? = null,
+        val anchorEndTimeMillis: Long? = null,
         override val details: String? = description
     ) : CalendarItem() {
         override val displayTime: LocalDateTime = startTime
@@ -36,6 +41,11 @@ sealed class CalendarItem {
         val description: String?,
         val dueDate: LocalDate,
         val isCompleted: Boolean,
+        val reminderEnabled: Boolean = true,
+        val repeatInterval: Int = 0,
+        val repeatUnit: String = "WEEK",
+        val repeatUntilMillis: Long? = null,
+        val anchorDueDate: LocalDate = dueDate,
         override val details: String? = description
     ) : CalendarItem() {
         // For tasks, the primary time reference is the start of the day they are due (at midnight).

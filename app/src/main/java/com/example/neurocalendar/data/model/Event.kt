@@ -16,7 +16,10 @@ data class Event(
     val startTimeMillis: Long,
     val endTimeMillis: Long,
     val location: String? = null,
-    @ColumnInfo(defaultValue = "0") val reminderMinutesBefore: Int = 0
+    @ColumnInfo(defaultValue = "0") val reminderMinutesBefore: Int = 0,
+    @ColumnInfo(defaultValue = "0") val repeatInterval: Int = 0,
+    @ColumnInfo(defaultValue = "'WEEK'") val repeatUnit: String = "WEEK",
+    val repeatUntilMillis: Long? = null
 ) {
     /** Converts stored epoch millis to the device's local time. */
     fun getStartTime(): LocalDateTime =

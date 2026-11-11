@@ -65,6 +65,16 @@ fun EventEditorDialog(
     var reminderMinutesBefore by remember(event?.id) {
         mutableStateOf(event?.reminderMinutesBefore ?: 0)
     }
+    var repeatInterval by remember(event?.id) {
+        mutableStateOf(event?.repeatInterval ?: 0)
+    }
+    var repeatUnit by remember(event?.id) {
+        mutableStateOf(event?.repeatUnit ?: "WEEK")
+    }
+    var repeatUntilMillis by remember(event?.id) {
+        mutableStateOf(event?.repeatUntilMillis)
+    }
+    var repeatIntervalValid by remember(event?.id) { mutableStateOf(true) }
     var showReminderOptions by remember(event?.id) { mutableStateOf(false) }
     var showOptionalFields by remember(event?.id) {
         mutableStateOf(!event?.description.isNullOrBlank() || !event?.location.isNullOrBlank())
@@ -77,10 +87,17 @@ fun EventEditorDialog(
     val startTime = parseEventTime(startText)
     val endTime = parseEventTime(endText)
     val invalidTimeOrder = startTime != null && endTime != null && endTime <= startTime
+    val repeatUntilDate = repeatUntilMillis?.let {
+        Instant.ofEpochMilli(it).atZone(zone).toLocalDate()
+    }
+    val invalidRepeatEnd = repeatInterval > 0 && repeatUntilDate?.isBefore(date) == true
+    val validRepeatRule = repeatIntervalValid && (repeatInterval == 0 || !invalidRepeatEnd)
 
     fun saveEvent() {
         attemptedSave = true
-        if (title.isBlank() || startTime == null || endTime == null || invalidTimeOrder) return
+        if (title.isBlank() || startTime == null || endTime == null ||
+            invalidTimeOrder || !validRepeatRule
+        ) return
 
         val savedEvent = Event(
             id = event?.id ?: 0,
@@ -89,7 +106,10 @@ fun EventEditorDialog(
             startTimeMillis = date.atTime(startTime).atZone(zone).toInstant().toEpochMilli(),
             endTimeMillis = date.atTime(endTime).atZone(zone).toInstant().toEpochMilli(),
             location = location.trim().ifBlank { null },
-            reminderMinutesBefore = reminderMinutesBefore
+            reminderMinutesBefore = reminderMinutesBefore,
+            repeatInterval = repeatInterval,
+            repeatUnit = repeatUnit,
+            repeatUntilMillis = repeatUntilMillis.takeIf { repeatInterval > 0 }
         )
 
         scope.launch {
@@ -167,6 +187,31 @@ fun EventEditorDialog(
                         }
                     }
                 )
+                RecurrenceControls(
+                    repeatInterval = repeatInterval,
+                    repeatUnit = repeatUnit,
+                    repeatUntilMillis = repeatUntilMillis,
+                    onRuleChange = { interval, unit, until ->
+                        repeatInterval = interval
+                        repeatUnit = unit
+                        repeatUntilMillis = until
+                    },
+                    onIntervalValidityChange = { repeatIntervalValid = it }
+                )
+                if (event != null && repeatInterval > 0) {
+                    Text(
+                        "Changes apply to the entire event series.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (invalidRepeatEnd) {
+                    Text(
+                        "The repeat end date must be on or after the first event date.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 Text("Reminder", style = MaterialTheme.typography.titleSmall)
                 Text(
                     "One quiet notification. No repeats.",
@@ -222,7 +267,7 @@ fun EventEditorDialog(
             }
         },
         confirmButton = {
-            Button(onClick = ::saveEvent, enabled = !isSaving) {
+            Button(onClick = ::saveEvent, enabled = !isSaving && validRepeatRule) {
                 Text(if (isSaving) "Saving…" else "Save event")
             }
         },

@@ -17,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.neurocalendar.domain.model.CalendarItem
@@ -36,6 +37,8 @@ fun DayView(
     items: List<CalendarItem>,
     date: LocalDate,
     onEditEvent: (CalendarItem.EventItem) -> Unit,
+    onEditTask: (CalendarItem.TaskItem) -> Unit,
+    onTaskCompletionChange: (CalendarItem.TaskItem, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -50,7 +53,12 @@ fun DayView(
                 modifier = Modifier.weight(1f).fillMaxWidth()
             ) {
                 items(items) { item ->
-                    DayItemCard(item = item, onEditEvent = onEditEvent)
+                    DayItemCard(
+                        item = item,
+                        onEditEvent = onEditEvent,
+                        onEditTask = onEditTask,
+                        onTaskCompletionChange = onTaskCompletionChange
+                    )
                 }
             }
         }
@@ -210,6 +218,8 @@ private fun CozyCalendarIllustration() {
 fun DayItemCard(
     item: CalendarItem,
     onEditEvent: (CalendarItem.EventItem) -> Unit,
+    onEditTask: (CalendarItem.TaskItem) -> Unit,
+    onTaskCompletionChange: (CalendarItem.TaskItem, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Use an animated card for expressive motion
@@ -257,6 +267,14 @@ fun DayItemCard(
                     TextButton(onClick = { onEditEvent(item) }) {
                         Text("Edit event")
                     }
+                } else if (item is CalendarItem.TaskItem) {
+                    Checkbox(
+                        checked = item.isCompleted,
+                        onCheckedChange = { onTaskCompletionChange(item, it) }
+                    )
+                    TextButton(onClick = { onEditTask(item) }) {
+                        Text("Edit task")
+                    }
                 }
             }
 
@@ -265,6 +283,16 @@ fun DayItemCard(
                 text = item.title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
+                textDecoration = if (item is CalendarItem.TaskItem && item.isCompleted) {
+                    TextDecoration.LineThrough
+                } else {
+                    TextDecoration.None
+                },
+                color = if (item is CalendarItem.TaskItem && item.isCompleted) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
                 modifier = Modifier.padding(bottom = 4.dp)
             )
 
@@ -320,7 +348,9 @@ fun PreviewDayView() {
         DayView(
             items = mockItems,
             date = LocalDate.of(2024, 7, 15),
-            onEditEvent = {}
+            onEditEvent = {},
+            onEditTask = {},
+            onTaskCompletionChange = { _, _ -> }
         )
     }
 }
